@@ -31,10 +31,20 @@ def spawn_planet_rel(player_mass):
     #placeholder for distance to Sun
     distToSun = random.uniform(1.0, 10.0)
 
-    return Planet(mass, radius, distToSun)
+     name = f"planet_{index}"
+
+    return Planet(mass, radius, distToSun, name)
 
 def spawn_batch(player_mass, n=10):
+    planets = []
     """
-    Creates 10 object planet
+    Creates n planets
     """
-    return[spawn_planet_rel(player_mass) for _ in range(n)]
+    for i in range(n):
+        planet = spawn_planet_rel(player_mass, i)
+        planets.append(planet)
+
+    return planets
+
+
+
