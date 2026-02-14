@@ -3,8 +3,9 @@ class PhysicsEngine:
     def __init__(self):
         self.sim = rebound.Simulation()
         
-        self.sim.collision = "direct" #mode of collision
-        self.sim.collision_resolve = "merge" #how collision is dealt with
+        self.sim.collision = "None" # we will handle collisions manually (in gamerules.py)
+        self.sim.units = ('AU', 'yr', 'Msun')
+        self.sim.integrator = "ias15"
 
         self.planets = [] # list of planets in the simulation
 
@@ -45,8 +46,17 @@ class PhysicsEngine:
             masses[planet.name] = p.m
         return masses
     
-    def __synch_planets(self):
-        for planet in self.planets:
-            if (not planet.exists) : 
-                self.sim.remove(planet.rebound_particle)
+    def remove_planet(self, planet):
+        if (not planet.exists) : 
+            # Removing planet from the simulation
+            self.sim.remove(planet.rebound_particle)
+            self.planets.remove(planet)
+
+            # Marking planet as non-existent
+            planet.exists = False
+
+            # Unlinking the particle from the planet
+            planet.rebound_particle = None
+
+            print(f"{planet.name} has been removed from the simulation.")
     
