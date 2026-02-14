@@ -51,4 +51,4 @@ i=0
 for p in sim.particles:
     print("Particle " + str(i))
     i += 1
-    print("Mass = " + str(p.m), p.x, p.y, p.vx, p.vy)
+    print( p.x, p.y, p.vx, p.vy)
