@@ -1,0 +1,87 @@
+import rebound
+import pygame
+import numpy as np
+import sys
+
+# 1. REBOUND 
+
+sim = rebound.Simulation()
+sim.units = ('AU', 'yr', 'Msun')
+sim.integrator = "ias15"
+
+SUN_MASS = 1.0
+sim.add(m=SUN_MASS)
+sim.add(m=3e-6, a=1.0)  # Earth
+
+sim.move_to_com()
+
+earth = sim.particles[1]
+
+dt = 0.002  # physics timestep (years)
+thrust_accel = 0.5     # acceleration magnitude (AU/yr^2)
+
+# 2. pygame 
+pygame.init()
+WIDTH, HEIGHT = 800, 800
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+clock = pygame.time.Clock()
+
+SCALE = 200
+CENTER = np.array([WIDTH//2, HEIGHT//2])
+
+running = True
+
+# 3. Main Loop
+
+while running:
+
+    clock.tick(60)
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    keys = pygame.key.get_pressed()
+
+
+    #  thrust direction
+   
+    thrust_vector = np.array([0.0, 0.0])
+
+    if keys[pygame.K_UP]:
+        thrust_vector[1] += 1
+    if keys[pygame.K_DOWN]:
+        thrust_vector[1] -= 1
+    if keys[pygame.K_LEFT]:
+        thrust_vector[0] -= 1
+    if keys[pygame.K_RIGHT]:
+        thrust_vector[0] += 1
+
+    if np.linalg.norm(thrust_vector) > 0:
+        thrust_vector = thrust_vector / np.linalg.norm(thrust_vector)
+        acceleration = thrust_vector * thrust_accel
+
+        # Apply deltav-vee
+        earth.vx += acceleration[0] * dt
+        earth.vy += acceleration[1] * dt
+
+   # Physics
+
+    sim.integrate(sim.t + dt)
+
+    # ----------------------------
+    # Render
+    # ----------------------------
+    screen.fill((0, 0, 0))
+
+    sun = sim.particles[0]
+    sun_pos = CENTER + np.array([sun.x, -sun.y]) * SCALE
+    pygame.draw.circle(screen, (255, 255, 0), sun_pos.astype(int), 10)
+
+    earth_pos = CENTER + np.array([earth.x, -earth.y]) * SCALE
+    pygame.draw.circle(screen, (100, 150, 255), earth_pos.astype(int), 6)
+
+    pygame.display.flip()
+
+pygame.quit()
+sys.exit()
