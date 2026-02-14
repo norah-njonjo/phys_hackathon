@@ -1,9 +1,9 @@
 import rebound
-class PhysicsEngine:
+class SolarSystem:
     def __init__(self):
         self.sim = rebound.Simulation()
         
-        self.sim.collision = "None" # we will handle collisions manually (in gamerules.py)
+        self.sim.collision = None # we will handle collisions manually (in gamerules.py)
         self.sim.units = ('AU', 'yr', 'Msun')
         self.sim.integrator = "ias15"
 
