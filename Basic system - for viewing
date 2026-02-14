@@ -11,13 +11,24 @@ sim = rebound.Simulation()
 sim.units = ('AU', 'yr', 'Msun')
 sim.integrator = "ias15"
 
-solsys = SolarSystem()
+sim.collision = None # we will handle collisions manually (in gamerules.py)
+
+
+
+
+
+"""
+for i in range(0, 9):
+    solsys.add_planet(planet.Planet(mass=3e-6 + i*1e-7, radius=0.05 + i*0.03, distToSun=1.0 + i*0.2, name=f"Planet {i}"))
+    """
+
 SUN_MASS = 1.0
 sim.add(m=SUN_MASS)
 sim.add(m=3e-6, a=1.0)  # Earth
-for i in range(0, len(solsys.planets)):
-    p = solsys.planets[i]
-    sim.add(m=p.mass, a=p.disToSun)
+
+# Adding planets to the simulation
+solsys = SolarSystem(sim)
+
 
 
 sim.move_to_com()
@@ -77,6 +88,8 @@ while running:
         earth.vx += acceleration[0] * dt
         earth.vy += acceleration[1] * dt
 
+    
+    
    # Physics
 
     sim.integrate(sim.t + dt)

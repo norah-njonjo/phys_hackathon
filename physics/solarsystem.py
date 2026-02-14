@@ -1,11 +1,9 @@
 import rebound
 class SolarSystem:
-    def __init__(self):
-        self.sim = rebound.Simulation()
+    def __init__(self, simulation):
+        self.sim = simulation
         
-        self.sim.collision = None # we will handle collisions manually (in gamerules.py)
-        self.sim.units = ('AU', 'yr', 'Msun')
-        self.sim.integrator = "ias15"
+        
 
         self.planets = [] # list of planets in the simulation
 
@@ -22,8 +20,6 @@ class SolarSystem:
         planet.rebound_particle = particle
         self.planets.append(planet)
 
-    def step(self, dt):
-        self.sim.integrate(self.sim.t + dt)
 
     def get_planet_positions(self):
         positions = {}
