@@ -1,0 +1,4 @@
+Each planet is an object of class Planet.
+The Physics Engine class holds 
+    - the planet player resides on 
+    - a set (an array) of planets : the solar system.
