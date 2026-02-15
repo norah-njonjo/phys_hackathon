@@ -33,10 +33,16 @@ def spawn_planet_rel(player_mass):
 
     return Planet(mass, radius, distToSun, name=f"Planet {random.randint(0, 1000)}")
 
+<<<<<<< Updated upstream
 def spawn_batch(player_mass, n=10):
     planets = []
     """
     Creates n planets
+=======
+def spawn_batch(player_mass, n=5):
+    """
+    Creates 5 object planet
+>>>>>>> Stashed changes
     """
     for i in range(n):
         planet = spawn_planet_rel(player_mass, i)
