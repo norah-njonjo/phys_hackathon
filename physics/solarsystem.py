@@ -7,17 +7,18 @@ class SolarSystem:
 
         self.planets = [] # list of planets in the simulation
 
-    def add_planet(self, planet):
-        # adding planet to the simulation
-        particle = self.sim.add(
-            m=planet.mass,
-            a=planet.distToSun, 
-            e=0
-        )
+   def add_planet(self, planet):
+    theta = random.uniform(0, 2*np.pi)
+    particle = self.sim.add(
+        m=planet.mass,
+        a=planet.distToSun,
+        e=0,
+        f=theta   # random true anomaly
+    )
 
-        # linking planet to the particle in the simulation
-        planet.rebound_particle = particle
-        self.planets.append(planet)
+    planet.rebound_particle = particle
+    self.planets.append(planet)
+
 
 
     def get_planet_positions(self):
