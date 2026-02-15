@@ -1,0 +1,205 @@
+import rebound
+import pygame
+import numpy as np
+import sys
+import random
+import math
+import os
+
+# --- FILE PATH SETUP ---
+base_path = os.path.dirname(__file__)
+
+# ==============================
+# 1. CLASSES & LOGIC
+# ==============================
+
+class Planet:
+    def __init__(self, mass, radius, distToSun, name):
+        self.mass = mass
+        self.radius = radius
+        self.distToSun = distToSun
+        self.name = name
+        self.rebound_particle = None
+
+class SolarSystem:
+    def __init__(self, simulation):
+        self.sim = simulation
+        self.planets = []
+
+    def add_planet(self, planet):
+        theta = random.uniform(0, 2 * math.pi)
+        self.sim.add(m=planet.mass, a=planet.distToSun, e=0, f=theta)
+        planet.rebound_particle = self.sim.particles[-1]
+        self.planets.append(planet)
+
+def mass_to_radius(mass):
+    return max(3, int((mass ** (1/3)) * 200))
+
+def spawn_batch(player_mass, sun_mass, n=10):
+    planets = []
+    for i in range(n):
+        mass = random.uniform(player_mass * 0.2, player_mass * 2.0)
+        mass = min(mass, sun_mass * 0.5)
+        dist = random.uniform(0.8, 1.4)
+        planet = Planet(mass=mass, radius=mass_to_radius(mass), distToSun=dist, name=f"Planet_{i}")
+        planets.append(planet)
+    return planets
+
+def custom_merge(sim, collision):
+    p1 = sim.particles[collision.p1]
+    p2 = sim.particles[collision.p2]
+    if p1.hash == "earth" or p2.hash == "earth":
+        earth = p1 if p1.hash == "earth" else p2
+        other = p2 if earth == p1 else p1
+        if earth.m >= other.m:
+            earth.m += other.m * 5
+            sim.remove(other.index)
+        else:
+            sim.remove(earth.index)
+    else:
+        sim.merge(collision)
+
+# ==============================
+# 2. INITIALIZE SIMULATION
+# ==============================
+
+sim = rebound.Simulation()
+sim.units = ('AU', 'yr', 'Msun')
+sim.integrator = "ias15"
+sim.collision = "direct"
+sim.collision_resolve = custom_merge
+
+SUN_MASS = 1.0
+EARTH_MASS = 3e-6
+sim.add(m=SUN_MASS)
+sim.add(m=EARTH_MASS, a=1.0, hash="earth")
+sim.move_to_com()
+
+solsys = SolarSystem(sim)
+random_planets = spawn_batch(player_mass=EARTH_MASS, sun_mass=SUN_MASS, n=12)
+for p in random_planets:
+    solsys.add_planet(p)
+sim.move_to_com()
+
+# ==============================
+# 3. PYGAME SETUP
+# ==============================
+
+pygame.init()
+WIDTH, HEIGHT = 1000, 1000
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Gravity Assimilation Game")
+clock = pygame.time.Clock()
+font = pygame.font.SysFont("Arial", 28, bold=True)
+
+# --- LOAD ASSETS ---
+def load_img(name, alpha=True):
+    path = os.path.join(base_path, name)
+    img = pygame.image.load(path)
+    return img.convert_alpha() if alpha else img.convert()
+
+sun_img_raw = load_img('sun.png')
+earth_img_raw = load_img('earth8.png')
+planet_img_raw = load_img('planet4.png')
+menu_raw = load_img('hub2.png', alpha=False)
+menu_raw.set_colorkey((255, 255, 255))
+
+# --- ASSET SCALING ---
+ui_scale = 0.5
+menu_img = pygame.transform.smoothscale(menu_raw, (int(menu_raw.get_width()*ui_scale), int(menu_raw.get_height()*ui_scale)))
+menu_rect = menu_img.get_rect(bottomleft=(0, HEIGHT))
+
+# --- GAME CONSTANTS ---
+SCALE = 350
+CENTER = np.array([WIDTH // 2, HEIGHT // 2])
+dt = 0.0004
+running = True
+
+# ==============================
+# 4. MAIN LOOP
+# ==============================
+
+while running:
+    clock.tick(60)
+    screen.fill((0, 0, 0))
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    if "earth" not in sim.particles:
+        # Simple Game Over behavior
+        screen.fill((50, 0, 0))
+        pygame.display.flip()
+        pygame.time.wait(2000)
+        running = False
+        continue
+
+    earth = sim.particles["earth"]
+
+    # --- MOUSE FOLLOW CONTROL ---
+    mouse_pos = np.array(pygame.mouse.get_pos())
+    mouse_sim = (mouse_pos - CENTER) / SCALE
+    mouse_sim[1] *= -1
+
+    direction = mouse_sim - np.array([earth.x, earth.y])
+    distance = np.linalg.norm(direction)
+
+    if distance > 0:
+        direction = direction / distance
+
+    keys = pygame.key.get_pressed()
+    base_speed = 3.0
+    if keys[pygame.K_LSHIFT]: base_speed = 6.0
+    if keys[pygame.K_SPACE]: base_speed = 1.0
+
+    target_velocity = direction * base_speed
+    steer_strength = 0.12
+    damping = 0.995
+
+    earth.vx = earth.vx * damping + (target_velocity[0] - earth.vx) * steer_strength
+    earth.vy = earth.vy * damping + (target_velocity[1] - earth.vy) * steer_strength
+
+    # --- PHYSICS STEP ---
+    sim.integrate(sim.t + dt)
+
+    # --- RENDER PLANETS ---
+    # Sun
+    sun = sim.particles[0]
+    sun_pos = CENTER + np.array([sun.x, -sun.y]) * SCALE
+    s_img = pygame.transform.scale(sun_img_raw, (40, 40))
+    screen.blit(s_img, s_img.get_rect(center=(int(sun_pos[0]), int(sun_pos[1]))))
+
+    # Earth
+    earth_pos = CENTER + np.array([earth.x, -earth.y]) * SCALE
+    e_size = max(10, int((earth.m / EARTH_MASS) ** (1/3) * 20))
+    e_img = pygame.transform.scale(earth_img_raw, (e_size, e_size))
+    screen.blit(e_img, e_img.get_rect(center=(int(earth_pos[0]), int(earth_pos[1]))))
+
+    # Other Planets
+    active_planets = 0
+    for planet in solsys.planets:
+        p = planet.rebound_particle
+        if p is not None and p.index < sim.N:
+            active_planets += 1
+            pos = CENTER + np.array([p.x, -p.y]) * SCALE
+            p_size = max(8, int((p.m / EARTH_MASS) ** (1/3) * 15))
+            p_img = pygame.transform.scale(planet_img_raw, (p_size, p_size))
+            screen.blit(p_img, p_img.get_rect(center=(int(pos[0]), int(pos[1]))))
+
+    # --- RENDER UI ---
+    screen.blit(menu_img, menu_rect)
+    
+    # Mass Display (Positioned at 117, 7 relative to menu_rect)
+    mass_val = round(earth.m * 1000000, 1)
+    mass_surf = font.render(f"{mass_val}", True, (255, 255, 255))
+    screen.blit(mass_surf, (menu_rect.x + 117, menu_rect.y + 7))
+    
+    # Planet Count (Positioned at 120, 50 relative to menu_rect)
+    count_surf = font.render(f"{active_planets}", True, (255, 255, 255))
+    screen.blit(count_surf, (menu_rect.x + 120, menu_rect.y + 50))
+
+    pygame.display.flip()
+
+pygame.quit()
+sys.exit()
