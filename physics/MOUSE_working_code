@@ -242,7 +242,6 @@ while running:
     pygame.draw.circle(screen, (100, 150, 255), earth_pos.astype(int), earth_draw_radius)
 
     # Other planets
-    # Other planets
     for planet in solsys.planets:
 
         p = planet.rebound_particle
@@ -258,6 +257,15 @@ while running:
 
         pygame.draw.circle(screen, (200, 200, 200), pos.astype(int), draw_radius)
 
+
+    #Draw asteriods
+    for a in asteriods:
+        p = a["p"]
+        r_au = a["r"]
+        pos = CENTER + np.array([p.x, -p.y]) * SCALE
+        r_px = max(2,int(r_au * SCALE))
+        pygame.draw.circle(screen, (180,180,180), pos.astype(int), r_px)
+        
 
     pygame.display.flip()
 
