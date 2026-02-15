@@ -40,6 +40,25 @@ clock = pygame.time.Clock()
 SCALE = 300
 CENTER = np.array([WIDTH//2, HEIGHT//2])
 
+def custom_merge(sim, collision):
+    p1 = sim.particles[collision.p1]
+    p2 = sim.particles[collision.p2]
+
+# If Earth is involved
+    if p1.hash == "earth" or p2.hash == "earth":
+        earth = p1 if p1.hash == "earth" else p2
+        other = p2 if earth == p1 else p1
+        earth.m += other.m * 10
+
+    # Remove smaller body
+        sim.remove(other.index)
+
+    else:
+    # Normal merge for others
+        sim.merge(collision)
+    
+sim.collision_resolve = custom_merge
+
 running = True
 
 # 3. Main Loop
@@ -81,25 +100,6 @@ while running:
     sim.integrate(sim.t + dt)
 
     earth = sim.particles["earth"]
-
-    def custom_merge(sim, collision):
-        p1 = sim.particles[collision.p1]
-        p2 = sim.particles[collision.p2]
-
-    # If Earth is involved
-        if p1.hash == "earth" or p2.hash == "earth":
-            earth = p1 if p1.hash == "earth" else p2
-            other = p2 if earth == p1 else p1
-            earth.m += other.m * 10
-
-        # Remove smaller body
-            sim.remove(other.index)
-
-        else:
-        # Normal merge for others
-            sim.merge(collision)
-    
-    sim.collision_resolve = custom_merge
 
 
     # Render
