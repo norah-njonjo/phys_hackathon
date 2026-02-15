@@ -13,7 +13,7 @@ sim.integrator = "ias15"
 # REBOUND collision settings: "direct" checks for collisions at each timestep, "merge" merges colliding particles into one.
 
 sim.collision = "direct"
-sim.collision_resolve = "merge"
+sim.collision_resolve = custom_merge
 
 # Normalize density 
 def density(m):
@@ -28,11 +28,12 @@ sim.move_to_com()
 
 # Adding planets to the simulation
 solsys = SolarSystem(sim)
+new_planets = spawn_batch(3e-6, 1.0, n=10)
 
+for p in new_planets:
+    solsys.add_planet(p)
 
-for i in range(4):
-    solsys.add_planet(planet.Planet(mass=3e-20 + i*1e-22, radius=0.05 + i*0.002, distToSun=1.0 + 0.4 + i*0.001, name=f"Planet {i}"))
-    sim.move_to_com()
+sim.move_to_com()
 
 earth = sim.particles["earth"]
 
@@ -66,9 +67,6 @@ def custom_merge(sim, collision):
         else:
         # Normal merge for others
             sim.merge(collision)
-    
-sim.collision_resolve = custom_merge
-
 running = True
 
 # 3. Main Loop
