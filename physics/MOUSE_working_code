@@ -147,7 +147,13 @@ SCALE = 350
 CENTER = np.array([WIDTH // 2, HEIGHT // 2])
 
 dt = 0.0004
+PLAYER_RADIUS_PX = 6
+MARGIN_PX = 20  
 
+X_MIN_AU = (-(WIDTH//2) + MARGIN_PX + PLAYER_RADIUS_PX) / SCALE
+X_MAX_AU = ((WIDTH//2) - MARGIN_PX - PLAYER_RADIUS_PX) / SCALE
+Y_MIN_AU = (-(HEIGHT//2) + MARGIN_PX + PLAYER_RADIUS_PX) / SCALE
+Y_MAX_AU = ((HEIGHT//2) - MARGIN_PX - PLAYER_RADIUS_PX) / SCALE
 running = True
 
 
@@ -205,8 +211,21 @@ while running:
 
 
     sim.integrate(sim.t + dt)
+    if earth.x < X_MIN_AU: #left wall
+        earth.x = X_MIN_AU
+        earth.vx = 0.0
+    elif earth.x > X_MAX_AU: #rt wall 
+        earth.x = X_MAX_AU
+        earth.vx = 0.0
 
-  
+    if earth.y < Y_MIN_AU: #bottom wall
+        earth.y = Y_MIN_AU
+        earth.vy = 0.0
+
+    elif earth.y > Y_MAX_AU: #top wall 
+        earth.y = Y_MAX_AU
+        earth.vy = 0.0
+
     # RENDER
   
 
