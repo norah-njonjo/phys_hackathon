@@ -113,7 +113,7 @@ def hub():
                 # MASS DISPLAY
                 display_mass = round(earth.m * 1000000, 1)
                 mass_surf = font.render(f"{display_mass}g", True, (255, 255, 255))
-                screen.blit(mass_surf, (move_rect.x + 40, move_rect.y + 45))
+                screen.blit(mass_surf, (move_rect.x + 117, move_rect.y + 7))
             else:
                 game_state = "LOSE"
 
