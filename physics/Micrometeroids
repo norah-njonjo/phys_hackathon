@@ -1,0 +1,326 @@
+import rebound
+import pygame
+import numpy as np
+import sys
+import random
+import math
+
+# =========================================================
+# DEBUG FLAGS
+# =========================================================
+
+DEBUG_SHOW_ASTEROID_COUNT = True
+DEBUG_FORCE_SPAWN = True
+
+# =========================================================
+# GAME CONSTANTS
+# =========================================================
+
+SUN_MASS = 1.0
+EARTH_BASE_MASS = 1e-4
+NUM_PLANETS = 10
+
+PHYSICAL_SCALE_BOOST = 15
+dt = 0.00005
+
+ASTEROID_SPAWN_RATE = 0.12
+ASTEROID_FIELD_RADIUS = 6.0
+ASTEROID_MIN_MASS = 1e-8
+ASTEROID_MAX_MASS = 5e-8
+
+# =========================================================
+# UTILITY
+# =========================================================
+
+def density(m):
+    return (m ** (1/3)) * PHYSICAL_SCALE_BOOST
+
+
+def mass_to_draw_radius(mass, base_mass):
+    return max(4, int((mass / base_mass) ** (1/3) * 8))
+
+
+# =========================================================
+# ASTEROID SYSTEM (NON-REBOUND)
+# =========================================================
+
+class MassAsteroid:
+    def __init__(self, x, y, mass_value):
+
+        self.x = x
+        self.y = y
+        self.mass_value = mass_value
+
+        angle = random.uniform(0, 2 * math.pi)
+        speed = random.uniform(0.1, 0.4)
+
+        self.vx = math.cos(angle) * speed
+        self.vy = math.sin(angle) * speed
+
+        self.life = random.randint(600, 1200)
+
+    def update(self):
+        self.x += self.vx
+        self.y += self.vy
+        self.life -= 1
+
+
+def spawn_random_asteroid(cx, cy):
+    angle = random.uniform(0, 2 * math.pi)
+    radius = random.uniform(0, ASTEROID_FIELD_RADIUS)
+
+    x = cx + math.cos(angle) * radius
+    y = cy + math.sin(angle) * radius
+
+    mass_value = random.uniform(ASTEROID_MIN_MASS, ASTEROID_MAX_MASS)
+
+    return MassAsteroid(x, y, mass_value)
+
+
+# =========================================================
+# COLLISION (EARTH ONLY)
+# =========================================================
+
+def custom_merge(sim, collision):
+
+    p1 = sim.particles[collision.p1]
+    p2 = sim.particles[collision.p2]
+
+    if p1.hash == "earth" or p2.hash == "earth":
+
+        earth = p1 if p1.hash == "earth" else p2
+        other = p2 if earth == p1 else p1
+
+        if earth.m >= other.m:
+            print("Planet absorbed into debris field.")
+            sim.remove(other.index)
+        else:
+            print("Earth destroyed.")
+            sim.remove(earth.index)
+
+    return 0
+
+
+# =========================================================
+# REBOUND SETUP
+# =========================================================
+
+sim = rebound.Simulation()
+sim.units = ('AU', 'yr', 'Msun')
+sim.integrator = "ias15"
+
+sim.collision = "direct"
+sim.collision_resolve = custom_merge
+
+sim.add(m=SUN_MASS, r=density(SUN_MASS))
+
+sim.add(
+    m=EARTH_BASE_MASS,
+    a=1.0,
+    r=density(EARTH_BASE_MASS),
+    hash="earth"
+)
+
+sim.move_to_com()
+
+for i in range(NUM_PLANETS):
+    mass = random.uniform(EARTH_BASE_MASS * 0.3,
+                          EARTH_BASE_MASS * 1.2)
+
+    dist = random.uniform(1.5, 4.0)
+
+    sim.add(
+        m=mass,
+        a=dist,
+        e=0,
+        f=random.uniform(0, 2 * math.pi),
+        r=density(mass)
+    )
+
+sim.move_to_com()
+
+# =========================================================
+# PYGAME
+# =========================================================
+
+pygame.init()
+WIDTH, HEIGHT = 1000, 1000
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+clock = pygame.time.Clock()
+
+CENTER = np.array([WIDTH // 2, HEIGHT // 2])
+
+camera_mode = "sun"
+mass_asteroids = []
+
+running = True
+
+# =========================================================
+# MAIN LOOP
+# =========================================================
+
+while running:
+
+    clock.tick(60)
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_f:
+                camera_mode = "earth" if camera_mode == "sun" else "sun"
+
+    try:
+        earth = sim.particles["earth"]
+    except rebound.ParticleNotFound:
+        print("Earth gone.")
+        break
+
+    # =====================================================
+    # EARTH SPEED SCALES WITH MASS
+    # =====================================================
+
+    growth_factor = earth.m / EARTH_BASE_MASS
+
+    base_speed = 8.0 / math.sqrt(growth_factor)
+    steer_strength = 0.35 / math.sqrt(growth_factor)
+    damping = 0.985
+
+    # =====================================================
+    # CAMERA
+    # =====================================================
+
+    if camera_mode == "earth":
+        SCALE = 100
+        camera_offset = np.array([earth.x, earth.y])
+    else:
+        SCALE = 100
+        camera_offset = np.array([0.0, 0.0])
+
+    # =====================================================
+    # MOUSE CONTROL
+    # =====================================================
+
+    mouse_pos = np.array(pygame.mouse.get_pos())
+    mouse_sim = (mouse_pos - CENTER) / SCALE
+    mouse_sim[1] *= -1
+
+    direction = mouse_sim - np.array([earth.x, earth.y])
+    dist = np.linalg.norm(direction)
+
+    if dist > 0:
+        direction /= dist
+
+    target_velocity = direction * base_speed
+
+    earth.vx = earth.vx * damping + (target_velocity[0] - earth.vx) * steer_strength
+    earth.vy = earth.vy * damping + (target_velocity[1] - earth.vy) * steer_strength
+
+    # =====================================================
+    # SPAWN ASTEROIDS
+    # =====================================================
+
+    if DEBUG_FORCE_SPAWN or random.random() < ASTEROID_SPAWN_RATE:
+
+        if camera_mode == "earth":
+            cx, cy = earth.x, earth.y
+        else:
+            cx, cy = 0.0, 0.0
+
+        mass_asteroids.append(spawn_random_asteroid(cx, cy))
+
+    # =====================================================
+    # UPDATE ASTEROIDS
+    # =====================================================
+
+    for asteroid in mass_asteroids[:]:
+
+        asteroid.update()
+
+        dx = asteroid.x - earth.x
+        dy = asteroid.y - earth.y
+        dist = math.sqrt(dx*dx + dy*dy)
+
+        absorb_radius = density(earth.m) * 1.2
+
+        if dist < absorb_radius:
+            earth.m += asteroid.mass_value
+            earth.r = density(earth.m)
+            mass_asteroids.remove(asteroid)
+            continue
+
+        if asteroid.life <= 0:
+            mass_asteroids.remove(asteroid)
+
+    # =====================================================
+    # PHYSICS
+    # =====================================================
+
+    sim.integrate(sim.t + dt)
+
+    # =====================================================
+    # RENDER
+    # =====================================================
+
+    screen.fill((0, 0, 0))
+
+    sun = sim.particles[0]
+    sun_pos = CENTER + np.array([
+        sun.x - camera_offset[0],
+        -(sun.y - camera_offset[1])
+    ]) * SCALE
+
+    pygame.draw.circle(screen, (255, 255, 0),
+                       sun_pos.astype(int), 12)
+
+    # Earth
+    if camera_mode == "earth":
+        earth_pos = CENTER
+    else:
+        earth_pos = CENTER + np.array([
+            earth.x - camera_offset[0],
+            -(earth.y - camera_offset[1])
+        ]) * SCALE
+
+    earth_draw_radius = mass_to_draw_radius(earth.m, EARTH_BASE_MASS)
+
+    pygame.draw.circle(screen, (100, 150, 255),
+                       earth_pos.astype(int),
+                       earth_draw_radius)
+
+    # Planets
+    for i in range(2, sim.N):
+
+        p = sim.particles[i]
+
+        pos = CENTER + np.array([
+            p.x - camera_offset[0],
+            -(p.y - camera_offset[1])
+        ]) * SCALE
+
+        pygame.draw.circle(screen, (200, 200, 200),
+                           pos.astype(int), 6)
+
+    # Asteroids
+    for asteroid in mass_asteroids:
+
+        pos = CENTER + np.array([
+            asteroid.x - camera_offset[0],
+            -(asteroid.y - camera_offset[1])
+        ]) * SCALE
+
+        pygame.draw.circle(screen, (255, 200, 100),
+                           pos.astype(int), 2)
+
+    # Debug overlay
+    if DEBUG_SHOW_ASTEROID_COUNT:
+        font = pygame.font.SysFont(None, 24)
+        text = font.render(f"Asteroids: {len(mass_asteroids)}",
+                           True, (255, 255, 255))
+        screen.blit(text, (10, 10))
+
+    pygame.display.flip()
+
+pygame.quit()
+sys.exit()
